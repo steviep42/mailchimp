@@ -1,0 +1,799 @@
+---
+title: "Modelling"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Linear Regression
+
+We'll start this lecture based on one of the more popular forms of modeling called Linear Regression wherein we predict the value of some outcome (like MPG from mtcars) using predictor variables from the mtcars data frame. We get an equation like Y = a + Bx + e where "e" represent some error terms, "a" is an intercept and "B"" represents a regression coefficient. 
+
+Sometimes the equation is written like Y = B0 + B1*x1 + B2*x2 ... + B3*x3 to indicate the use of multiple predictor variables from the data set. The x values are variables from the data set and the B values are coefficients computed from solving the "least squares equation".
+
+## Background
+
+With respect to mtcars we could plot the MPG variable as a function of a car's weight. This looks close to being a linear relationship. Close enough that we could try creating a linear model perhaps. As a first cut model we could simply estimate the MPG of any new observations by using the existing mean of the MPG from the current data. Visually this looks like:
+
+```{r}
+plot(mtcars$wt,mtcars$mpg,pch=19,ylim=c(0,40))
+
+abline(h=mean(mtcars$mpg),lty=2)
+
+mpgmn <- mean(mtcars$mpg)
+
+segments(mtcars[,'wt'],mpgmn,mtcars[,'wt'],mtcars[,'mpg'])
+
+denom <- sum( (mtcars$mpg - mean(mtcars$mpg))^2 )
+```
+
+Then we could take the sum of the squares of the differences between the points and the baseline which is one measure of variation. The problem with this is that for every incoming new observation we will predict it's respective MPG as the mean of the existing data.  Not only is this likely not to be a good model it is boring. We might try to come up with our own line designed to "fit" the data. The goal would be to try to find a line that minimizes the distance between the points and the line we come up with. We know that because it is a straight line it can't possibly "touch" all the points. (We could try a quadratic equation but it coould have similar problems).
+
+The following is an attempt at "eyeballing" and appropriate line or two although I'm not using any guiding mathematical ideas except perhaps to guess that the line is of the form y = -x or some variation thereof.
+
+See https://en.wikipedia.org/wiki/Ordinary_least_squares
+
+See http://setosa.io/ev/ordinary-least-squares-regression/
+
+In reality the "best" line is he one that satifies the "Ordinary Least Squares" equation. 
+
+![alt text](Figures/regression.png)
+
+
+
+```{r}
+plot(mtcars$wt,mtcars$mpg,pch=19,ylim=c(0,40))
+
+lines(1:5,seq(40,0,-10),col="red")
+
+lines(1:5,seq(45,0,-10),col="blue")
+ 
+```
+
+Even though we have now found the theoretical "best" line through these points we should compare the measure of variation between this line and the baseline.  
+
+```{r}
+mylm <- lm(mpg ~ wt, data=mtcars)
+
+summary(mylm)
+
+plot(mtcars$wt,mtcars$mpg,pch=19,type="n",ylim=c(0,40))
+points(mtcars$wt,mylm$fitted.values,pch=19)
+
+abline(mylm)
+
+abline(h=mean(mtcars$mpg),lty=2)
+
+segments(mtcars[,'wt'],mean(mtcars$mpg),mtcars[,'wt'],mylm$fitted.values)
+
+numerator <- sum( (mylm$fitted.values - mean(mtcars$mpg))^2 )
+```
+
+Once we do this we can look at the ratio of the numerator to denominator and this gives us what is known as the R squared that is many times used to judge the quality of a model. In reality we usually use something called the adjusted R-squared value but the R-squared concept is an important concept in general. 
+
+
+```{r}
+
+(r.squared <- numerator/denom)
+
+summary(mylm)$r.squared
+
+```
+
+So let's build a model that predicts MPG using Wt as a predictor variable. We'll start out with just one predictor variable. 
+
+```{r}
+mylm <- lm(mpg ~ wt, data=mtcars)
+
+summary(mylm)
+
+plot(mtcars$wt,mtcars$mpg,pch=19,ylim=c(0,40))
+
+abline(h=mean(mtcars$mpg),lty=2)
+
+abline(mylm)
+
+segments(mtcars[,'wt'],mylm$fitted.values,mtcars[,'wt'],mtcars[,'mpg'])
+```
+
+## Evaluating our Model 
+
+### Significance of the predictors
+
+We see a couple of things in our summary. That the Intercept and the predictor are highly significant. This means that it appears that wt is a pretty solid predictor of MPG. We also look at the Adjusted R-squared value. Generally speaking the higher the better although this will depend on the type of data being modeled. For example with human reaction data the R squares can be low but the model can still be effective. So when weight increases  we can expect a reduction in MPG. That makes sense according to what we already know. 
+
+### R-Squared
+
+Let's go back to R-squared which gives us a measure of how much variation is explained by this model which in this case is 75%. That's not bad actually. We look at the Adjusted R-squared value which attempts to tell us how well our model would generalize. In this case it's slightly lower but it's still good. Now here is the thing - whenever we add in new predictors the R squared will go up. 
+
+### F Test
+
+Also note that the F-statistic gives us something to consider. It is reporting the results of an ANOVA (Analysis of Variance).  This result tells us that an F value this large has a 1.294e-10 probability of occurring assuming that the null hypothesis was true. 
+
+The F-test of the overall significance is a specific form of the F-test. It compares a model with no predictors to the model that you specify so the F-test can evaluate a number of predictors simultaneously. A regression model that contains no predictors is also known as an intercept-only model. The hypotheses for the F-test of the overall significance are as follows:
+
+    Null hypothesis: The fit of the intercept-only model and your model are equal.
+    Alternative hypothesis: The fit of the intercept-only model is significantly reduced compared to your model.
+
+So in our case we know our model is better than something with no predictors. Wonderful !
+
+### Dispersion of the residuals
+
+The residuals should be normally distributed. There are a couple of ways to test this:
+
+```{r}
+# The resulting plot should be a straight diagonal line
+
+qqnorm(mylm$residuals)
+
+hist(mylm$residuals)  # Should resemble a normal distribution
+
+shapiro.test(mylm$residuals)
+
+```
+
+## Improving the Model
+
+Well the idea is to add variables to the model in a way that improves the R-squared AND results in coefficients that are statistically significant AND has a big F value and a low p-value AND has normally dsitributed residuals. Whew ! In reality there are other things to look at but that's enough for now. Anway, one simple way to proceed is look at the correlation matrix of the data. We probably should have done this before we created our first model but we knew that a car's weight probably impacts it's eventual MPG. 
+
+```{r}
+mylm.1 <- lm(mpg ~ wt + cyl , data=mtcars)
+
+summary(mylm)
+```
+
+```{r}
+round(cor(mtcars),2)
+
+pairs(mtcars)
+```
+
+So we pick variables that are correlated with MPG although if any of the additional variables are also strongly correlated with Wt then that might not necessarily improve the model. There is a concept called "colinearity" wherein one variable can seemingly represent a second variable thus there is no need to include it. So we look for other variables correlated to weight but not necessarily so strongly correlated. 
+
+```{r}
+mylm.2 <- lm(mpg ~ wt + drat , data=mtcars)
+
+summary(mylm.2)
+
+```
+
+Nice try but it turns out that drat isn't significant nor does it do much to improve the Adjusted R-squared. What about horse power ? That does in fact present an interesting model. So we can keep doing this - adding in values that is to improve the model assuming that it's possible. 
+
+```{r}
+mylm.3 <- lm(mpg ~ wt + hp , data=mtcars)
+
+summary(mylm.3)
+
+```
+
+## Step Wise Regression
+
+But there is an easier way although you might lose your "statistician's card" for relying upon stepwise regression. We could use it in combination with something called the AIC (Akaike Information Criterion) to systematically evaluate different modesl which in turn are combinations of predictors from the data. 
+
+We go "forwards" or "backwards" which means we can start with one predictor and build into a model with multiple predictors. Or we can start with many predictors and move down to one. For each model we compute the AIC and at the end of the process we pick the model that has the "best" AIC. Note that the computed AIC is not absolute in any sense. It's value is useful only when compared to other models. There are other approaches to doing a systematic evaluation of predictors such as using "Forced Entry" or "Hierarchical Regression". But for now we'll check out Stepwise to show some other models. With regard to our data:
+
+
+```{r}
+# We start with an initial model that includes all predictors.
+
+mylm <- lm(mpg ~ ., data=mtcars)
+
+steps <- step(mylm, direction="backward")
+
+summary(steps)
+```
+
+Note that evaluating the output of any regression requires careful consideration of a number of things. These are just some of them. 
+
+## Training vs Test
+
+Well we used the entire data frame for this but we should have held out some of the records. We don't have many observations in this data frame as it is but let's hold out say 25 percent which equates to 8 records.
+
+```{r}
+set.seed(123)
+test <- sample(1:32,8,F)
+testcars  <- mtcars[test,]
+traincars <- mtcars[-test,]
+
+model <- lm(mpg~.,data=traincars)
+steps <- step(model, direction="backward")
+
+summary(steps)
+
+```
+
+The same model as before winds up being the best although the am variable is barely significant. Now let's do some prediction on the test set to see how close we came to the actual y values.
+
+```{r}
+predict(steps,testcars)
+
+predict(steps,testcars) - testcars$mpg
+
+```
+
+## Applied Regression - MoneyBall
+
+
+![Moneyball](Figures/pitt.png)
+
+Note that the lots of this material has been taken from "The Analytics Edge" course on EDX with some additions and modifications. First let's read in some information relating to Professional Baseball teams between the years 1962 and 2012 although we will focus on certain years in this range.
+
+```{r}
+# Read in data
+# Source is http://www.baseball-reference.com/ via Edx class
+
+url <- "https://raw.githubusercontent.com/steviep42/INFO550/master/Week10/baseball.csv"
+baseball <- read.csv(url,stringsAsFactors=FALSE)
+str(baseball)
+```
+
+Some key column meanings - some are self-explanatory like Team, Year
+RS - Runs Scored, RA - Runs Allowed, W - Wins for the year, G - Number of games played. Let's focus on the Okaland A's subject of movie called "Moneyball". They got new owners in 1995 who imposed strong budget cuts and limits. How do you field a competitive team when you can't afford to pay anyone known
+to be good by standard performance measures ? 
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+moneyball <- filter(baseball, Year < 2002)
+
+# Some win loss history
+
+moneyball %>% filter(Team=="OAK",Year >= 1992) %>% 
+  mutate(percent_win=W/G) %>% 
+  ggplot(aes(x=Year,y=percent_win)) + geom_line() + 
+  ggtitle("Oakland A's Winning Percentage") + ylab("Winning Percentage")
+
+# Let's build a table 
+
+moneyball %>% filter(Team=="OAK",Year >= 1992) %>% 
+  mutate(percent=round(W/G,2)) %>% group_by(Year) %>% 
+  summarize(percent)
+
+# Let's do some salary comparison for the year 1999
+
+moneyball %>% 
+   filter(Year==1999, Team == "OAK" | Team == "NYY" | Team == "BOS") %>%
+   select(Team,W)
+
+```
+
+Okay looking at http://www.stlsports.com/articles/ja.mlbsalaries.html
+We see that NYY spent 91 million, BOS spent 72 million, and OAK spent 25 mil
+But Oakland still won lots of games. Perhaps some skills are overvalued and some undervalued in the scouting process ? 
+
+We would like to predict if a team can make the playoffs by knowing how many 
+games they won in a season. How many wins would it take to make it to playoffs? 95 ? 
+
+```{r}
+moneyball %>% filter(Year >= 1996) %>% 
+  ggplot(aes(x=W,y=Team,col=factor(Playoffs))) + geom_point()
+
+```
+
+Use Linear Regression to determine how many games they will win using the diff between runs scored and runs allowed. So compute this difference and save in a new column.
+
+```{r}
+moneyball <- mutate(moneyball,RD = RS - RA)
+
+# Scatterplot to check for linear relationship
+ggplot(moneyball,aes(x=RD,y=W)) + 
+  geom_point() + ggtitle("Wins vs Runs Difference") + 
+  xlab("Run Difference") + ylab("Wins")
+
+# Strong linear relationship between these two variables
+# Regression model to predict wins
+
+WinsReg <- lm(W ~ RD, data=moneyball)
+summary(WinsReg)
+
+```
+
+So the RD coefficient is strongly significant and also has a high R-squared value. We could now ask some questions like given that we know that we need to win at least 95 games to make the playoffs how large does the run difference need to be to accomplish that ? This can be solved using some basic algerbra.
+
+```{r eval=FALSE}
+Wins = 80.8814 + 0.1068*RD
+
+Wins >= 95 
+
+80.8814 + 0.1068*RD >= 95 
+
+RD >= (95 - 80.8814)/0.1068 = 133.4 
+
+```
+
+So a team needs to score at least 134 runs than they allow. This next leads us to how to predict the number runs a team will score. For this we turn to batting statistics to make that determination. 
+
+As a second consideration we also want to predict how many runs a team will allow based on pitching and fielding stats.
+
+Let's build a regression model to predict runs scored by a team - How does a team score runs ? Hitting the ball, walking, getting on base for starters. There are some metrics in the data frame that can help us with these. For example the variables for On Base Percentage and Slugging Percentage (how far a batter gets around bases), as well as Batting Average are there. Note that the professional scouts, at least up until the mid 90s, though that Batting Average along was the single most important deteriminant of run scoring. 
+
+
+```{r}
+
+RunsReg <- lm(RS ~ OBP + SLG + BA, data=moneyball)
+summary(RunsReg)
+
+# We might have some multicollinearity here
+
+cor(moneyball[,7:9])
+RunsReg <- lm(RS ~ OBP + SLG, data=moneyball)
+summary(RunsReg)
+
+# So maybe BA is overvalued
+```
+
+So it turns out that we have the information for an opposing teams On Base Percentage and Slugging Percentage so it becomes easy for us to come up with a regression equation that predict's the number of runs they will score against us (in this case "we" are the Oakland Atheltics).
+
+
+```{r}
+RunsAllowed <- lm(RA ~ OOBP + OSLG, data=moneyball)
+
+summary(RunsAllowed)
+```
+
+## Predicting the number of Runs scored in 2002 
+
+What if we wanted to predict the number of runs for the 2002 season ? Well we have information that allowed us to create a regression equation to predict runs scored. Now, we have the data in our data set for the 2002 season but we filtered it out. Here is what we could do - we could go to a site like http://espn.go.com/mlb/stats/team/_/stat/batting/year/2001 and come up with an average OBP and SLP for the team and plug that into our equation. 
+
+
+```{r}
+summary(RunsReg)
+
+# Runs = -804.63 + 2737.77*OBP + 1584.91*SLG
+# Runs = -804.63 + 2737.77*0.345 + 1584.91*0.439 = 835.67 runs
+
+```
+
+We could also use our regression equation that we generated for predicting the number of runs that would be scored against us. We would look for pitching statistics for the Oakland As from here http://espn.go.com/mlb/stats/team/_/stat/pitching/year/2001/type/expanded to get the Opposing OBP and SLG and plug that into our equation.
+
+```{r}
+summary(RunsAllowed)
+
+# RA = -837.38 + 2913.6*OOBP + 1514.29*OSLG
+# RA = -837.38 + 2913.6*0.308 + 1514.29*0.380 = 635.439
+
+
+```
+
+```{r eval=FALSE}
+Now remember that the number of Wins in a season had a regression equation of
+
+Wins = 80.8814 + 0.1068*RD
+
+So let's compute this for the 2002 season
+
+Wins = 80.8814 + 0.1068*RD
+
+Wins = 80.8814 + 0.1068*(835.67-635.439)
+
+Wins = 102.2661
+
+baseball %>% filter(Year==2002 & Team=="OAK") %>% head
+
+```
+
+# Practice
+
+Fetch the following file that has information on musical recording artists and their sales figures. Work with this data to come up with at least 4 different models involving different predictors and combinations thereof to predict sales. The data set isn't complicated so it should be easy to get a handle on the data. Do things look at correlations. Do some pairs plotting to see what variables might have linear relationships. Then create some models. 
+
+```{r}
+url <- "https://raw.githubusercontent.com/steviep42/INFO550/master/Week10/album_sales_2.csv"
+sales <- read.csv(url,sep="\t",header=TRUE)
+
+```
+
+
+# Clustering 
+
+Here we will consider a couple of approaches known as 1) Hierarchical and 2) K-Means Clustering. We'll consider Hierachical Clustering first. This takes data and puts each data point / observation into it's own cluster. The individual points/clusters are merged into pairs of clusters until there is a single cluster. This is what Hierachical Clustering does. To be specific the recursive algorithm is:
+
+* Find the two closest points in the dataset
+* Link these points and consider them as a single point
+* The process starts again, now using the the new dataset that contains the new point.
+
+## Distance 
+To do this requires us to measure the distance between points. The aim is that the measured distances between observations of the same cluster are as small as possible and the distances between clusters are as large as possible. There are a number of methods to compute distances such as:
+
+* Euclidean
+* Maximum 
+* Manhattan
+* Canberra
+* Binary
+* Perason
+* Correlation
+* Spearman 
+
+One of the simplest is to use the "euclidean distance". Here is how we might compute the distance between two vectors. 
+
+```{r}
+v1 <- c(0,1,1,0,0,1,1,0,1)
+
+v2 <- c(0,1,1,0,0,1,1,0,1)
+
+v3 <- c(0,1,1,0,0,1,1,0,0)
+
+ sqrt(sum((v1-rev(v2))^2))
+
+# These are identical so there should not be any distance
+
+dist(rbind(v1,v2))
+
+dist(rbind(v1,v3))
+
+dist(rbind(v1,rev(v2)))
+
+dist(rbind(rbind(v1,v2,v3)))
+```
+
+Note that if the vectors are not on the same scale then we need to standardize the data - subtract each vector element from it's mean and then divide by the standard deviation. Anyway R has a function called **dist** that supports many distance methods:
+
+```{r eval=FALSE}
+dist(x, method = "euclidean", diag = FALSE, upper = FALSE, p = 2)
+
+the distance measure to be used. This must be one of "euclidean", "maximum", 
+"manhattan", "canberra", "binary" or "minkowski". Any unambiguous substring can be given.
+```
+
+## Linkage
+
+Tightly coupled with the idea of computing distance is the **linkage method** which is necessary for calculating the inter-cluster distances. 
+
+
+| LINKAGE METHOD  | DEFINITION                                               |
+|:----------------|:---------------------------------------------------------|
+| Single Linkage  | The distance between two clusters is the minimum distance between an observation in one cluster and an observation in the other cluster. A good choice when clusters are obviously separated |
+|                 |                                                          |
+| Complete Linkage | The distance between two clusters is the maximum distance between an observation in one cluster and an observation in the other cluster. It can be sensitive to outliers |
+|                 |   |
+|Average Linkage | The distance between two clusters is the mean distance between an observation in one cluster and an observation in the other cluster|
+|               |   |
+|Centroid Linkage | The distance between two clusters is the distance between the cluster centroids or means|
+|               |   |
+|Median Linkage | The distance between two clusters is the median distance between an observation in one cluster and an observation in the other cluster. It reduces the effect of outliers|
+|               |   |
+|Ward Linkage | The distance between two clusters is the sum of the squared deviations from points to centroids. Try to minimize the within-cluster sum of squares. It can be sensitive to outliers|
+
+Here are some graphic examples of distances and linkages between some example clusters. First we have:
+
+### Minimum Distance
+
+![Minimum Distance](Figures/min_dist.png)
+
+### Maximum Distance
+
+![Maximum Distance](Figures/max_dist.png)
+
+### Centroid
+
+![Centroid](Figures/centroid.png)
+
+## Hierarchical Clustering
+
+Here is a graphic representation of what happens during HC:
+
+![HC](Figures/hc.png)
+
+## Clustering the Iris Data
+
+Let's look at the built-in iris data that has three Species. We can group the 150 rows into clusters using Hieratchical clustering. We'll create a distance matrix. To do this we'll need to exclude the text that describes the Species since it is a label.
+
+```{r}
+data(iris)
+
+str(iris)
+
+dist.iris <- dist(iris[,-5])   # Default method is euclidean
+
+# Now we pass the distance matrix to the hclust function
+
+iris_hclust <- hclust(dist.iris)
+
+# Clustered objects have their own special plot function that results
+# in a Dendrogram
+
+plot(iris_hclust, label=iris$Species, cex=0.4)
+
+# There is another special plot that given a number of proposed clusters
+# will draw a corresponding number of rectangles
+
+rect.hclust(iris_hclust, k=3, border="red")
+```
+
+So one way to pick the number of clusters is by "drawing" a horizontal line across the vertical lines of the "dendrogram". The longer the vertical lines then the greater the difference between the clusters. The idea is to draw a vertical line in such a way as to cross over a number of vertical lines with some "wiggle room". We can do this visually or we could use the **cutree** function to do this.
+
+```{r}
+library(ggplot2)
+
+iris_3 <- cutree(iris_hclust, k=3)
+
+# iris_3 <-  cutree(iris_hclust, h=3.5)
+
+labs <- factor(iris_3,labels=1:3)
+
+ggplot(iris,aes(x=Sepal.Length,y=Sepal.Width,fill=labs)) +
+       geom_point(pch=23,size=3.0) +
+       ggtitle("3 Clusters, Dist: Euclidean, Method: Complete ")
+```
+
+
+Note that Hierarchical Clustering is not a classification method but since we created 3 clusters let's see how close the clusters match the actual Species given in the iris data frame. It seems like it got all of the Setosas correct, but it got only 23 of the Versicolors correct, and only one of the Virginicas correct.  But again, this isn't a classification method. 
+
+```{r}
+table(cluster=iris_3,species=iris$Species)
+
+```
+
+We could try a different number of clusters based on the dendrogram. 
+
+```{r}
+
+plot(iris_hclust, label=iris$Species, cex=0.4)
+
+rect.hclust(iris_hclust, k=4, border="red")
+
+iris_4 <- cutree(iris_hclust, k=4)
+
+labs <- factor(iris_4,labels=1:4)
+
+ggplot(iris,aes(x=Sepal.Length,y=Sepal.Width,fill=labs)) +
+       geom_point(pch=23,size=3.0) +
+       ggtitle("4 Clusters, Dist: Euclidean, Method: Complete ")
+
+table(cluster=iris_4,species=iris$Species)
+
+```
+
+## Different Linkage Method
+
+Let's pick a different linkage method. We'll select "Ward". Again, this isn't an attempt to do classification but in this case we see a better match between the actual Species and the predicted clusters.
+
+```{r}
+
+iris_hclust <- hclust(dist.iris, method="ward.D2")
+
+plot(iris_hclust, label=iris$Species, cex=0.4)
+
+rect.hclust(iris_hclust, k=3, border="red")
+
+iris_3 <- cutree(iris_hclust, k=3)
+
+labs <- factor(iris_3,labels=1:3)
+
+ggplot(iris,aes(x=Sepal.Length,y=Sepal.Width,fill=labs)) +
+       geom_point(pch=23,size=3.0) +
+       ggtitle("3 Clusters, Dist: Euclidean, Method: Ward.D2")
+
+table(cluster=iris_3,species=iris$Species)
+
+```
+
+## Looking at the mtcars data
+
+We could look at the mtcars data frame and attempt to cluster those cars therein. We have a difference here in that the columns are not all measured on the same scale so we'll need to scale the data. 
+
+```{r}
+data(mtcars)
+
+scaled.mtcars <- scale(mtcars)
+
+dist.mtcars <- dist(scaled.mtcars)
+
+mtcars_clust <- hclust(dist.mtcars,method="ward.D2")
+
+plot(mtcars_clust,cex=0.8)
+
+# Based on the plot let's try 4 clusters
+
+rect.hclust(mtcars_clust, k=4, border="red")
+
+mtcars_4 <- cutree(mtcars_clust, k=4)
+
+labs <- factor(mtcars_4,labels=1:4)
+
+ggplot(mtcars,aes(x=wt,y=mpg,fill=labs)) +
+       geom_point(pch=23,size=3.0) +
+       ggtitle("4 Clusters, Dist: Euclidean, Method: ward.D2")
+
+table(cluster=mtcars_4,species=mtcars$cyl)
+```
+
+## K-Means Clustering
+
+Before looking at a more interesting example let's consider a companion method to Hierarchical Clustering called K-Means cluster. K-Means is different in that we pick the number of clusters in advance. There are some helper functions that can assist us in determining the number of clusters but the idea here is if we have some intuition up front we pick he number of clusters. See http://www.di.fc.ul.pt/~jpn/r/clustering/clustering.html#k-means
+
+
+1) Pick an initial set of K centroids (this can be random or any other means)
+
+2) For each data point, assign it to the member of the closest centroid according to the given distance function
+
+3) Adjust the centroid position as the mean of all its assigned member data points. 
+
+4) Go back to (2) until the membership isn’t change and centroid position is stable.
+
+5) Output the centroids.
+
+Visually the result might look like:
+
+![KMeans](Figures/kmeans.png)
+
+```{r}
+
+set.seed(101) # So you will get the same result as me
+
+data(mtcars)
+
+scaled.mtcars <- scale(mtcars)
+
+km <- kmeans(scaled.mtcars,4)
+labs <- factor(km$cluster,labels=1:4)
+sm <- data.frame(scaled.mtcars)
+centers <- as.data.frame(km$centers)
+
+title <- "K-Means cluster with Centroids"
+plot(sm$wt,sm$mpg,col=km$cluster,main=title)
+points(km$centers[,c(6,1)],col=1:4,pch=19,cex=2)
+grid()
+
+table(cyl=mtcars$cyl,cluster=km$cluster)
+
+```
+
+There are methods to selecting the so called optimal number of clusters such as noting at what point adding another cluster doesn't contribute to an explanation of the total variance in the data set. This is called the "elbow method". There are packages that can help you with this selection process such as the NbClust package in R. 
+
+```{r}
+library(NbClust)
+
+scaled.mtcars <- scale(mtcars)
+
+res <- NbClust(scaled.mtcars,distance="euclidean",
+               min.nc=2,max.nc=6,method="ward.D2",
+               index="silhouette")
+
+
+res <- NbClust(scale(iris[,-5]),distance="euclidean",
+               min.nc=2,max.nc=6,method="ward.D2",
+               index="all")
+
+
+```
+
+# Let's go to the Movies
+
+## Collaborative Filtering
+
+
+         Men in Black    Apollo 13   Top Gun    Terminator
+------  ------------  ----------- ----------  ----------
+Amy           5             4          5            4
+Bob           3                        2            5
+Carl                        5          4            4
+Dan           4             2          
+
+* Given this data maybe we suggest to Carl that he watch "Men in Black" since Amy liked it and they appear to have similar preferences. This is known as **Collaborative Filtering**
+
+* Can suggest things without understanding the underlying attributes of the movie
+
+* There can be lots of information on each user times the total number of users ! Big Data
+
+## Content Filtering
+
+Consider the following line of thinking. Amy liked "Men in Black". We don't necessarily know why unless she tells us or makes some comments in a forum that we monitor. But based on the information that we have we can make some recommendations using the following considerations. The movie "Men in Black":
+
+* Was directed by Barry Sonnenfeld so maybe recommend "Get Shorty" (directed by Sonnenfeld)
+
+* Is classified in Action, Adventure, Sci-Fi, Comedy so maybe recommend "Jurassic Park" which is similarly classfied
+
+* Stars Will Smith so maybe recommend another Will Smith comedy move like "Hutch"
+
+* Also stars Tommy Lee Jones so maybe recommend "Space Cowboys" 
+
+Content filtering requires little data to get started. Content-based filtering methods are based on a description of the item and maybe a profile of the user’s preference
+
+## Hybrid Recommenders
+
+Hybrid recommendation systems are also a possibility and offer a strong solutions:
+
+* A collaborative filtering approach that finds that Amy and Carl have similar preferences
+
+* After that we could then do content filtering where we find that "Terminator", which both Amy and Carl liked is also classified in the same set of genres as is "Starship Troopers"
+
+* So recommend "Starship Troopers" even though neither have seen it
+
+## Movie Lens
+
+Movies in the dataset are categorized according to 18 different genres. Each movie can belong to different genres. Can we systematically find groups of movies with similar sets of genres ? 
+
+Unsupervised learning goal is to segment the data into similar groups instead of doing predictions as to what group it belongs in. But once we observe the clusters we could then come up with some hypothesis about important variables that could be used in a classification problem.
+
+So we put each data point into a group with "similar" values. It doesn't predict anything. This works best for large data sets. many different algorithms. we'll do hierarchical and k-means
+
+## Hierarchical Clustering
+
+Each data point starts in its own cluster. Then HC combines the two nearest into one clust
+
+## R Markdown
+
+```{r}
+suppressMessages(library(dplyr))
+url <- "http://files.grouplens.org/datasets/movielens/ml-100k/u.item"
+
+movies <- read.table(url,header=FALSE,sep="|",quote="\"",stringsAsFactors = FALSE)
+
+mnames <- c("ID","Title","ReleaseDate","VideoReleaseDate",
+             "IMDB","Unknown","Action","Adventure","Animation",
+             "Childrens","Comedy","Crime","Documentary",
+             "Drama","Fantasy","FilmNoir","Horror","Musical",
+              "Mystery","Romance","SciFi","Thriller",
+              "War","Western")
+  
+  
+colnames(movies) <- mnames
+
+movies <- select(movies,-ID,-ReleaseDate,-VideoReleaseDate,-IMDB) %>% unique 
+
+```
+
+Okay how to analyze this stuff ? Let's cluster the movies by genre. Let's see how we can make recs. First we compute all distances then cluster
+
+```{r}
+distances <- dist(movies[,2:20],method="euclidean")
+clusterMovies <- hclust(distances, method="ward")
+plot(clusterMovies)
+
+```
+
+We can label each point by the cluster it belongs to 
+
+```{r}
+clusterGroups <- cutree(clusterMovies, k=10)
+
+# Okay let's see how many Action Movies show up in each cluster - we want to compute a percentage
+
+myt <- table(movies=movies$Action,clusters=clusterGroups)
+
+# Okay divide the number of actual action movies (row 2) by the column sum to get the
+# percentages. We now know the percentage of Action movies in each cluster. 
+
+myt[2,]/colSums(myt)
+
+# We should do this for each genre. Another way to do all this is this way
+
+tapply(movies$Action,clusterGroups,mean)
+
+# note the next line is pretty advanced - it's just a quick way to avoid for loops
+
+myclusters <- data.frame(t(sapply(3:20,function(x) tapply(movies[,x],clusterGroups,mean))))
+
+myclusters <- data.frame(sapply(myclusters,round,2))
+rownames(myclusters) <- names(movies)[3:20]
+colnames(myclusters) <- paste("C",1:10,sep="")
+
+```
+
+## Inspect the clusters for meaningful content
+
+* Cluster 1 has lots of different movie types so it's like a Misc category. 
+* Cluster 2 has lots of Action, Adventure, and Sci-fi
+* Cluster 3 has lots of Crime, Mystery, and Thriller.
+* Cluster 4 has ONLY Drama movies
+* Cluster 5 has ONLY Comedy movies
+* Cluster 6 has mostly Romance movies
+* Cluster 7 has lots of Comedy and Romance movies 
+* Cluster 8 has Documentary 
+* Cluster 9 has Comedy and Drama
+* Cluster 10 has mostly Horror
+
+So what if we like the movie Men in Black. What other movies might we want to see based on our clustering scheme ? 
+
+```{r}
+movies[movies$Title=="Men in Black (1997)",]
+
+# So row 257 corresponds to MIB. Which cluster did 257 go into
+
+clusterGroups[257]
+
+cluster2 <- movies[clusterGroups == 2,]
+cluster2$Title[1:20]
